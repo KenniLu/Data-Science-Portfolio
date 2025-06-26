@@ -1,0 +1,477 @@
+---
+title: "Assessment Autumn 2025"
+author: "Ken Lu"
+date: "2025-05-07"
+output: pdf_document
+---
+
+# Read dataset
+
+```{r}
+rm(list = ls()) # cleaning the environment
+PGA <- read.csv("businessesPGA.csv")
+PGB <- read.csv("businessesPGB.csv")
+review <- read.csv("reviews.csv")
+users <- read.csv("users.csv")
+```
+
+# Install and call the 'Tidyverse' package
+
+```{r message = FALSE, warning = FALSE}
+# install.packages('tidyverse')
+library('tidyverse')
+library(knitr)
+# install.packages("kableExtra") #
+library(kableExtra)
+# for knitting 
+#install.packages("tinytex")
+#tinytex::install_tinytex()
+```
+
+#Data cleaning and grouping\
+
+Remove NA or empty values of columns that will be used to answer all the questions.\
+
+```{r}
+# Data cleaning and grouping
+## Cleaning data - review
+review <- review %>%  
+  mutate(user_id = str_trim(user_id)) %>% #remove any empty spaces
+  filter(user_id != "") # remove any empty strings 
+
+## Cleaning data - users
+users <- users %>%
+  mutate(user_id = str_trim(user_id)) %>% #remove any empty spaces
+  filter(user_id != "") # remove any empty strings 
+
+## There are empty space/string in state in PGA and PGB. They need to be removed before continue 
+PGA <- PGA %>%
+  mutate(state = str_trim(state)) %>% #remove any empty spaces
+  filter(state != "") %>% # remove any empty strings in state column
+  filter(business_id != "") # remove any empty strings in state column
+
+PGB <- PGB %>% 
+  mutate(state = str_trim(state)) %>% #remove any empty spaces
+  filter(state != "") %>% # remove any empty strings 
+  filter(business_id != "") # remove any empty strings in state column
+```
+
+# Question 1:
+
+## 1.1) Dividing the users into 3 groups: Veteran, Intermediate and New:
+
+```{r}
+# Classify the reviews from 3 groups of users
+## Transform data type of member_since variable from chr into date. 
+users$member_since <- as.Date(users$member_since)
+
+## Group review and users into 1 group - maindata
+maindata <- review %>%
+  left_join(users, by = c("user_id" = "user_id")) %>% #fill more details of users into the reviews data
+  drop_na(review_id, business_id, member_since, user_id) %>% # eliminate NA in review_id, business_id, member_since and user_id columns
+  select(-review_count, -average_stars) # eliminate unused columns
+
+## The reviews from Veteran users
+reviewOfVeteran <- maindata %>%
+  filter(member_since < as.Date('2017-01-01')) 
+
+## The reviews from Intermediate users
+reviewOfIntermediate <- maindata %>% 
+  filter(between(member_since, as.Date('2017-01-01'), as.Date('2022-12-31'))) 
+
+## The reviews from New users
+reviewOfNew <- maindata %>% 
+  filter(member_since > as.Date('2022-12-31')) 
+```
+
+**Note:**\
+From the observations, it finds that each dataset is a sample of the bigger database, so that datasets are not complete with each other. To analyse the user behaviour, 'review' dataset is considered the most important dataset among others. Therefore, 'review' dataset will be used as the main base for the analysis and others will be adjusted to join into 'review'. The adjusted dataset will be called as 'maindata'.\
+
+## 1.2) Calculate the numbers of users, their average review stars and average number of reviews per user in each group.
+
+```{r}
+# Create a function to identify the average review stars of each user and their total number of reviews in each group
+user_group_func <- function(x) {
+  data <- x %>% 
+    group_by(user_id) %>% 
+    summarise("Review Count" = n_distinct(review_id), "Average Review Stars of User" = round(mean(stars),3))
+}
+
+# Create a function to calculate the numbers of users, their average review stars and average number of reviews per user in each group
+group_figures <- function(x) {
+  data <- x %>%
+  summarise("Total User" = n_distinct(user_id), "Total Reviews" = sum(`Review Count`), 
+  "Average Review Stars/User" = mean(`Average Review Stars of User`), 
+  "Average Number of Review/ User" = mean(`Review Count`)) 
+  }
+
+# The average review stars and the total reviews of individual users in each group
+veteran <- user_group_func(reviewOfVeteran)
+intermediate <- user_group_func(reviewOfIntermediate)
+new <- user_group_func(reviewOfNew) 
+
+veteran
+intermediate
+new
+
+# The total number of users, the average review stars and average number of reviews per user in each group
+veteran_cal <- group_figures(veteran)
+intermediate_cal <- group_figures(intermediate)
+new_cal <- group_figures(new)
+
+veteran_cal
+intermediate_cal
+new_cal
+```
+
+```{r}
+# Combine the calculations of each group into 1 data.frame and create a kable
+user_group <- c("Veteran","Intermediate","New") # This will becomes the column names for the table 
+table1 <- rbind(veteran_cal, intermediate_cal, new_cal) %>% 
+  mutate("Age Group" = user_group) %>%
+  select("Age Group", everything())
+  
+table1 
+## Turn the table into a kable
+kable(table1, caption = "The summary of average figures by groups")%>%
+  kable_styling(bootstrap_options = c("bordered"), position = "center")
+```
+
+## 1.3) Visualise the Average Review Stars by User Age Group.
+
+```{r}
+# Bar chart to visual the overall view of the Average Review Stars by the User Age Group
+Figure_1 <- ggplot(data = table1, mapping = aes(x = `Age Group`, y = `Average Number of Review/ User`, fill = `Age Group`)) + 
+  geom_bar(stat = "identity", width = 0.6) + 
+  labs(title = "The Average Review Stars per User", x = "Age Group", y = "Average Review Stars", fill = "Age Group") + 
+  coord_flip()
+Figure_1
+
+Figure_2 <- ggplot(data = table1, mapping = aes(x = `Age Group`, y = `Average Review Stars/User`, colors = `Age Group`)) +
+  geom_point(size = 4) + 
+  labs(title = "The Average Review Stars per User", x = "Age Group", y = "Average Review Stars", fill = "Age Group") + 
+  geom_point(size = 4, mapping = aes(col = `Age Group`)) +
+  coord_flip() + 
+  theme_minimal()
+Figure_2
+```
+
+**Findings from table - The summary of average figures by groups**\
+Key Statistics:\
+
+-   It is obvious to notice that the Intermediate accounts for the majority of users interactions in the dataset 'review'. They have the total of over 22k users with over 100k reviews. The records are significantly higher than the total users who are Veteran and New and the total reviews.\
+-   However, the average review stars and the average number of reviews per user in each group are around 2.99 and 4.7 respectively.\
+-   Moreover, each user from any of 3 groups will give around 5 reviews (round up from 4.7).\
+
+Comments:\
+
+-   The scale of the stars rating presents the preference/favor of the users to the business they review. With the average review stars at 2.99 across all groups, it states that, despite the old or new users, they share a common 'normal' favor to the services of businesses they review.\
+
+-   From the level of activeness perspective, Intermediate users are the most active reviewers in this review sample. They accounts for the majority of reviews. However, New users are also a pool of potential active population when they raise up to 8311 users and have given over 39.5k online reviews just within 2 years (from 2023 to 2025 when the report is carried out). Noting that the average number of reviews per user across the groups are similar at around 4.7 reviews per individual. This reflects a same pattern of all users disregard of when they signed in.\
+
+-   Overall, the data shows that the feelings of all identical users in the review sample towards the services they received are at average (normal). However, it also indicates that Intermediate and New users are very active in giving feedback for the businesses they visited. Meanwhile, each user tends to give around 5 reviews.\
+
+# Question 2:
+
+## 2.1) Calculate the average review star, the number of reviews and the number of unique users. Compare the differences between 2 datasets (PGA and PGB).
+
+```{r}
+# Create 2 data from maindata, 1 with only PGA businesses and 1 with only PGB businesses
+mainPGA <- maindata %>% 
+  inner_join(PGA, by = c("business_id" = "business_id")) %>% # join 2 groups using business_id
+  select(-c(stars.y,review_count,categories, X, business_group, name.y,city)) # eliminate any unused columns
+
+mainPGB <- maindata %>% 
+  inner_join(PGB, by = c("business_id" = "business_id")) %>% # join 2 groups using business_id
+  select(-c(stars.y,review_count,categories, X, business_group, name.y,city)) # eliminate any unused columns
+```
+
+```{r}
+# calculate figures from mainPGA
+## Create a function to work on the calculations
+state_figures <- function(x){
+  data <- x %>% 
+    group_by(state) %>% 
+    summarise("Average Review Star" = round(mean(stars.x),3), # calculate 3 values
+            "Number of Reviews" = n_distinct(review_id), 
+            "Number of Unique Users" = n_distinct(user_id)) %>% 
+  mutate("The Proportion of Unique Users" = `Number of Unique Users`/sum(`Number of Unique Users`)) %>% # calculate the distribution of users in each state
+  arrange(state) # reorder the State variable in ascending order
+}
+
+cal_PGA <- state_figures(mainPGA)
+cal_PGB <- state_figures(mainPGB)
+
+cal_PGA
+cal_PGB
+```
+
+## 2.2) Visualise the average review star, the number of reviews and the number of unique users by state
+
+```{r}
+# combine 2 groups mainPGA and mainPGB for the comparison and visualisation purposes.
+## add a column to know it is from PGA
+cal_PGA <- cal_PGA %>% 
+  mutate("Group" = "PGA") 
+
+## add a column to know it is from PGB
+cal_PGB <- cal_PGB %>% 
+  mutate("Group" = "PGB") 
+
+## Then, combine 2 groups so that we have a data set with category in advance
+joinPGAPGB <- cal_PGA %>%
+  rbind(cal_PGB)
+
+## Visualise by Average Review Star
+ggplot(data = joinPGAPGB, mapping = aes(x = state, y = `Average Review Star`, fill = Group)) + geom_col(position = "dodge", width = 0.5) + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1), legend.position = "bottom") + # Rotate x-axis labels
+  geom_line(aes(group = Group, color =Group)) + 
+  labs(y = "The Average Review Star", title = "Comparing The Average Review Star by State between PGA and PGB")
+
+## Visualise by Number of Reviews
+ggplot(data = joinPGAPGB, mapping = aes(x = state, y = `Number of Reviews`, fill = Group)) + geom_col(position = "dodge", width = 0.5) + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1), legend.position = "bottom") + # Rotate x-axis labels
+  geom_line(aes(group = Group, color =Group)) + 
+  labs(y = "The Number of Reviews", title = "Comparing The Number of Reviews by State between PGA and PGB")
+
+## Visualise by Number of Unique Users
+ggplot(data = joinPGAPGB, mapping = aes(x = state, y = `Number of Unique Users`, fill = Group)) + 
+  geom_col(position = "dodge", width = 0.5) + 
+  geom_line(aes(group = Group, color =Group)) + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1), legend.position = "bottom") + # Rotate x-axis labels
+  labs(y = "The Number of Unique Users", title = "Comparing The Number of Unique Users by State between PGA and PGB")
+
+## Visualise by Proportion of Unique Users by State
+ggplot(data = joinPGAPGB, mapping = aes(x = state, y = `The Proportion of Unique Users`, fill = Group)) + 
+  geom_col(position = "dodge", width = 0.5) + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1), legend.position = "bottom") + # Rotate x-axis labels
+  labs(y = "The Proportion of Unique Users by State", title = "Comparing The Proportion of Unique Users by State between PGA and PGB")
+```
+
+**Findings from the visualisations**\
+
+-   From the Average Review Star bar chart, it indicates the all users share common feelings about the services they used which is 'normal' (around 3 stars). This observation is consistent with the findings in the question 1.\
+
+-   The attention is at the number of users per State. Nothing that the variable State is taken from the PGA and PGB dataset, not from the Users dataset. Thus, it does not mean the user is coming from that State. Instead, it should be understood as the number of unique users who visit businesses in that State. From the graph ‘The Number of Unique Users by State’, it appears that there are more unique users reviewing the businesses in group PGA than group PGB. Therefore, it is reasonable to see the outnumbers of reviews for businesses between two group from ‘The Number of Reviews by State between PGA and PGB’ graph.\
+
+-   From this insight, it could state that the businesses in group PGA are attracting more attention of users than the businesses in the other group. However, this conclusion does not deem that businesses in group PGA are having more visits than businesses in group PGB because people could visit and do not leave any reviews.\
+
+-   On the other hand, based on the distribution of users by state, businesses in DC (in PGB) received the most reviews from unique users, while businesses in HI (in PGA) received the most in their group. This suggests that businesses in DC from PGB and in HI from PGA attracted the most attention within their respective groups.\
+
+# Question 3:
+
+## 3.1) Identify the top 10 users by the review count. For those top 10 users, calculate their average review stars.
+
+```{r}
+# Identify the top 10 users using maindata 
+top10 <- maindata %>%
+  group_by(user_id) %>% 
+  summarise(review_count = n_distinct(review_id)) %>% #count the total reviews per unique user
+  arrange(desc(review_count)) %>%  #soft review_count from the biggest to the smallers 
+  slice_head(n = 10) # take the top 10
+top10
+
+# Use this list to identify their reviews in the maindata
+reviews_of_Top10 <- maindata %>%
+  semi_join(top10, by = "user_id")
+```
+
+```{r warning=FALSE, message=FALSE}
+# For those top 10 users, calculate their average review stars.
+avg_Review_top10 <- reviews_of_Top10 %>%
+  group_by(user_id) %>%
+  summarise("Average Review Stars" = round(mean(stars), 3), 
+            "Review Count" = n_distinct(review_id)) %>%
+  arrange(desc(`Review Count`))
+
+table2 <- kable(avg_Review_top10, caption = "The summary of average figures of top 10: Before and After 2020") %>% 
+  kable_styling(bootstrap_options = c("bordered"), position = "center")
+table2
+
+# Further analysis is conducted to identify the pattern of each users' behaviours
+by_Star_top10 <- reviews_of_Top10 %>%
+  group_by(user_id, stars) %>%
+  summarise("Total Reviews per Star per Top10 User" = n())
+
+table3 <- kable(by_Star_top10, caption = "The Number of Reviews per Star Per Top10 User") %>% 
+  kable_styling(bootstrap_options = c("bordered"), position = "center")
+table3
+```
+
+## 3.2) Visualise their rating distribution.
+
+```{r}
+ggplot(data = avg_Review_top10, mapping = aes(x = user_id ,y = `Average Review Stars`, fill = `Review Count`)) + 
+  geom_col() +
+  labs(x = "User ID", title = "The Bar Chart Summarises the Average Review Stars by Top 10 Users")
+
+ggplot(data = by_Star_top10, mapping = aes(x = stars, y = `Total Reviews per Star per Top10 User`)) +
+  geom_line() + 
+  geom_smooth(se = FALSE, method = 'lm', span = 1) + 
+  facet_wrap(~ user_id, nrow = 3)
+```
+
+**Findings**\
+
+-   The visual bar chart tells that in the top 10 users, the average review stars arranges in between 2 to 3 stars. It means that most of their experiences with at least 14 different businesses were ‘normal’. This finding is continue to be consistent with two previous studies about the average review stars.\
+
+-   Moreover, the gap in the total number of reviews between the top 1 user and the top 10 is not significant (18 reviews and 14 reviews), therefore, the comparison about their behaviour will not be impacted.\
+
+-   With a closer look into the pattern of each user in the next visual, the number of upward trend to the right (more good overall experiences - higher stars, less bad overall experiences - lower stars) are not significant. Only the line of user u_29224 shows this trend in the most obvious way. Meanwhile, at least 4 upward trend to the left (less good overall experiences - higher stars, more bad overall experiences - lower stars) are seen (u_17629, u_27070 , u_22933 and u_32335). The rest shows an equal distributions in giving their stars.\
+
+-   Overall, it appears that in the group of the most active users, they receive more negative experiences than positive experiences.\
+
+# Question 4:
+
+## 4.1) Analyse the differences between the review behavior of users who joined before and after 2020.
+
+```{r}
+# separate the maindata into 2 groups of users
+## Reviews Before2020 (including 31.12.2019)
+reviews_bf2020 <- maindata %>%
+  filter(member_since < as.Date('2020-01-01')) %>%
+  mutate("Length of text" = nchar(text)) # Count the length of each review
+
+## Reviews After2020 (including 01.01.2020)
+reviews_af2020 <- maindata %>%
+  filter(member_since >= as.Date('2020-01-01')) %>% 
+  mutate("Length of text" = nchar(text)) # Count the length of each review
+```
+
+## 4.2) For these 2 groups of users, compare the star rating behaviour and the length of the reviews.
+
+```{r}
+# Identify rating behaviour metrics - average review stars, average number of reviews per user, and the length of the reviews 
+## create a function to do the calculation
+behaviour_group2020 <- function(x) {
+  data <- x %>%
+    group_by(user_id)  %>% 
+    summarise("Review Count" = n(), 
+            "Average Review Star of User" = round(mean(stars),3), 
+            "Average Length of Reviews" = round(mean(`Length of text`),3))
+}
+
+group2020_figures <- function(x) {
+  data = x %>%
+    summarise("Average Number of Reviews" = round(mean(`Review Count`),3), 
+            "Average Review Star" = round(mean(`Average Review Star of User`),3), 
+            "Average Length of Reviews" = round(mean(`Average Length of Reviews`),3))
+}
+
+behaviour_bf2020 <- behaviour_group2020(reviews_bf2020)
+avg_Figure_bf2020 <- group2020_figures(behaviour_bf2020)
+
+behaviour_af2020 <- behaviour_group2020(reviews_af2020)
+avg_Figure_af2020 <- group2020_figures(behaviour_af2020)
+
+table4 <- avg_Figure_bf2020 %>% 
+  rbind(avg_Figure_af2020) %>% #combine 2 dataframes
+  mutate(Group = c("Before 2020", "After 2020")) %>% #create a new column to name the group
+  relocate(Group) # move the column Group to the most left
+
+kable(table4, caption = "The summary of average figures of 2 groups: Before and After 2020", digits = 3) %>%
+  kable_styling(bootstrap_options = c("bordered"), position = "center")
+
+kable(behaviour_bf2020, caption = "The behaviour of each user in group Before 2020", digits = 3) %>%
+  kable_styling(bootstrap_options = c("bordered"), position = "center")
+
+kable(behaviour_af2020, caption = "The behaviour of each user in group After 2020", digits = 3) %>%
+  kable_styling(bootstrap_options = c("bordered"), position = "center")
+```
+
+```{r}
+# Analyst the length of reviews by stars by using review_bf2020 and review_af2020 data.
+by_star_figures <- function(x, group_name) {
+  data <- x %>%
+    group_by(stars) %>% 
+    summarise("The Number of Review" = n(), "The Average Length of Review" = round(mean(`Length of text`),3)) %>%
+    mutate(Group = group_name) %>%
+    relocate(Group)
+}
+
+## The Number of Review by Star and The Average Length of Review by Star in Group Before 2020
+by_Star_bf2020 <- by_star_figures(reviews_bf2020, "Before 2020")
+by_Star_bf2020
+
+## The Number of Review by Star and The Average Length of Review by Star in Group After 2020
+by_Star_af2020 <- by_star_figures(reviews_af2020, "After 2020")
+by_Star_af2020
+```
+
+## 4.3) Visualise the findings:
+
+```{r}
+# Visualise the Average Review Length and The Average Review Star as a group
+## Combine 2 data frames behaviour_bf2020 and behaviour_af2020.
+group2020_combined <- behaviour_af2020 %>% 
+  mutate(Group = 'Before 2020') %>%
+  bind_rows(behaviour_af2020 <- behaviour_af2020 %>% 
+              mutate(Group = 'After 2020'))
+
+## Visualise by boxplots
+ggplot(data = group2020_combined, mapping = aes(x = `Average Review Star of User`, fill = Group)) + 
+  geom_boxplot() + 
+  labs(title = 'The boxplot presents the Average Review Star of User in 2 groups, Before and After 2020')
+
+ggplot(data = group2020_combined, mapping = aes(x = `Average Length of Reviews`, fill = Group)) + 
+  geom_boxplot() +
+  labs(title = 'The boxplot presents the Average Length of Reviews in 2 groups, Before and After 2020')
+
+ggplot(data = group2020_combined, mapping = aes(x = `Review Count`, fill = Group)) + 
+  geom_boxplot() + 
+  labs(title = 'The boxplot presents the Review Count in 2 groups, Before and After 2020')
+```
+
+**Findings:**\
+
+-   Regardless of the users’ registration period (before or after 2020), the average star rating remains consistent at around 3 stars. This reinforces earlier findings, suggesting that users generally express neutral or moderate satisfaction with the services they review.\
+
+<!-- -->
+
+-   The boxplot of average review length shows that both user groups share similar reviewing habits, with an average of approximately 60 words per review. However, there are notable outliers—some reviews are fewer than 25 words, while others range from 110 to nearly 200 words, indicating variability in how much users choose to write.\
+
+-   When examining the number of reviews per user, both groups show a similar distribution. On average, users write around five reviews. The boxplot shapes suggest that most users contribute fewer than five reviews, although there are several outliers who have submitted more than ten.\
+
+```{r}
+## Visualise by Star 
+# Combine 2 groups
+by_Star <- by_Star_bf2020 %>%
+  bind_rows(by_Star_af2020)
+
+ggplot(data = by_Star, mapping = aes(x = stars, y= `The Number of Review`, fill = Group)) + 
+  geom_col() + 
+  labs(title = "The Distribution of Reviews by Star in 2 groups", x = "Star", y = "The Number of Review", fill = "Group") 
+
+ggplot(data = by_Star, mapping = aes(x = stars, y= `The Number of Review`, fill = Group)) + 
+  geom_col(position = "dodge") + 
+  labs(title = "The Distribution of Reviews by Star in 2 groups", x = "Star", y = "The Number of Review", fill = "Group") 
+
+ggplot(data = by_Star, mapping = aes(x = stars, y= `The Average Length of Review`, fill = Group)) + 
+  geom_col(position = "dodge") + 
+  labs(title = "The Average Length of Review by Star in 2 groups", x = "Star", y = "The Average Length of Review", fill = "Group")
+
+ggplot(data = by_Star, mapping = aes(x = stars, y= `The Average Length of Review`, fill = Group)) + 
+  geom_col(position = "dodge") + 
+  labs(title = "The Average Length of Review by Star in 2 groups", x = "Star", y = "The Average Length of Review", fill = "Group")
+```
+
+**Findings**\
+A further breakdown of user behavior by star rating is presented in three supporting graphs:\
+
+-   The distribution of reviews by star rating shows that users who joined after 2020 contributed more reviews than those who joined earlier. However, in both groups, reviews are fairly evenly spread across star ratings from 1 to 5, indicating a balanced perception of services across time.\
+
+-   The bar chart showing average review length by star indicates that users in both groups consistently write around 60 words per review, regardless of whether they gave a 1-star or 5-star rating. Although earlier boxplots reveal the presence of outliers, the overall length does not appear to vary significantly with the user’s satisfaction level. Therefore, review length does not serve as a reliable indicator of how users feel about the businesses.\
+
+-   Overall, there are no significant differences in review behavior between users who joined before and after 2020. On average, users from both groups give 3-star reviews with a length of about 60 words. This further suggests that review length does not reflect user preferences or satisfaction. However, users who joined after 2020 appear to be slightly more active, as shown by their higher number of submitted reviews.\
+
+# Conclusion - key highlights:
+
+Across the four questions, each taking a different approach to analysing the dataset, some main patterns in user behaviour can be observed:
+
+1.  Regardless of business location (State) or join time (member_since), the average review star rating per user remains around 3 stars. In addition, analysis in Question 4 shows that reviews are evenly distributed across all star ratings from 1 to 5. This suggests that **users are generally unbiased—neither overly critical nor excessively positive**. Interestingly, while it is often assumed that people only leave reviews when they are either very satisfied or dissatisfied, this dataset shows a significant number of moderate reviews (2, 3, and 4 stars). **This pattern points to a healthy level of active and balanced engagement from the community**.
+
+<!-- -->
+
+2.  Another key observation is related to the businesses that attract more user attention. Users submitted more reviews for businesses in Group PGA compared to Group PGB. While we cannot draw strong conclusions about user preferences, **this may suggest that businesses in Group PGA are either more well-known within the community or have implemented more effective marketing or review strategies to drive engagement**.
+
+3.  Finally, it is notable that **the length of reviews does not indicate review sentiment**. As shown in Question 4, users tend to write reviews of approximately 60 words, regardless of whether they rate a business 1 star or 5 stars. This suggests that **review length is not a reliable indicator of user satisfaction and should not be used to infer the sentiment or quality of an experience**.\
