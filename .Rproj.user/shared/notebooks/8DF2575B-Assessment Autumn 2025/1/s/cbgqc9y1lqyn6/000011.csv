@@ -1,0 +1,6 @@
+"0",""
+"0","# calculate average review stars of the top 10 "
+"0","avg_star_top_10 <- mean(top_10_users$average_stars)"
+"0",""
+"0","# Tabulate the summary of the data"
+"0","kable(top_10_users)"

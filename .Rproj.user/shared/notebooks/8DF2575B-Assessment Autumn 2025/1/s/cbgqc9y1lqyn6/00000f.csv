@@ -1,0 +1,7 @@
+"0","# soft the order of users by the review count"
+"0","softed_users <- users %>% "
+"0","  arrange(desc(users$review_count)) "
+"0",""
+"0","# take the top 10 users "
+"0","top_10_users <- data.frame(head(softed_users, n = 10))"
+"0","top_10_users"

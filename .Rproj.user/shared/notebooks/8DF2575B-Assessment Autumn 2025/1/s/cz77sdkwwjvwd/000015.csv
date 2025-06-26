@@ -1,0 +1,2 @@
+"0","kable(table1, caption = ""The summary of users' reviews"", digits = 2, col.names = c(""The Numbers of Users"", ""Average Review Stars"", ""Average Number of Reviews"")) %>%"
+"0","  kable_styling(bootstrap_options = c(""bordered""), position = ""center"")"

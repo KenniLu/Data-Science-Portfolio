@@ -1,0 +1,6 @@
+"0","rm(list = ls()) # clearning the environment"
+"0",""
+"0","PGA <- read.csv(""businessesPGA.csv"")"
+"0","PGB <- read.csv(""businessesPGB.csv"")"
+"0","review <- read.csv(""reviews.csv"")"
+"0","users <- read.csv(""users.csv"")"

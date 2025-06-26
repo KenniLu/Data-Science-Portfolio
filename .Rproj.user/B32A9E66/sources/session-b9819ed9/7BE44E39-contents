@@ -1,0 +1,255 @@
+---
+title: "Assessment Autumn 2025"
+author: "Ken Lu"
+date: "2025-05-07"
+output: pdf_document
+---
+
+# Read dataset
+```{r}
+rm(list = ls()) # clearning the environment
+
+PGA <- read.csv("businessesPGA.csv")
+PGB <- read.csv("businessesPGB.csv")
+review <- read.csv("reviews.csv")
+users <- read.csv("users.csv")
+```
+
+# install and call the 'Tidyverse' package
+```{r}
+# install.packages('tidyverse')
+library('tidyverse')
+
+library(knitr)
+
+# install.packages("kableExtra") # hỏi N có bị tìm thấy conflict giữa tidyverse vs kableExtra ko?
+library(kableExtra)
+```
+
+
+# Question 1:
+# Write the code to analyse the review behaviour across user groups. 
+## divided users into 3 groups: Veteran, Intermediate and New (based on their member since date) before 2017, between 2017-2022, and after 2022 respectively. 
+```{r}
+users$member_since <- as.Date(users$member_since)
+
+Veteran <- users %>%
+  filter(member_since < as.Date('2017-01-01'))
+
+Intermediate <- users %>% 
+  filter(between(users$member_since, as.Date('2017-01-01'), as.Date('2022-12-31')))
+  
+New <- users %>% 
+  filter(member_since > as.Date('2022-12-31'))
+
+Vwteran
+Intermediate
+New
+
+# detect any NA value in the subset
+sum(is.na(Veteran))
+sum(is.na(Intermediate))
+sum(is.na(New))
+
+# Note: 
+# With the use of filter from tidyverse, the NA value in the member_since variable has been excluded. However, the subsets (Veteran, Intermediate and New) are detected with some rows which do not provide all information. However, they are not NA value. Thus, all three data sets are ready to be used for further analysis. 
+```
+
+# Calculate the numbers of users, their average review stars and average number of reviews per user. Tabulate the data using kable or kableextra. 
+```{r}
+# Calculate for Veteran
+total_users_veteran <- as.numeric(count(Veteran))
+avg_stars_veteran <- mean(Veteran$average_stars)
+avg_reviews_veteran <- mean(Veteran$review_count)
+
+# Calculate for Intermediate
+total_users_intermediate <- as.numeric(count(Intermediate))
+avg_stars_intermediate <- mean(Intermediate$average_stars)
+avg_reviews_intermediate <- mean(Intermediate$review_count)
+
+# Calculate for New
+total_users_new <- as.numeric(count(New))
+avg_stars_new <- mean(New$average_stars)
+avg_reviews_new <- mean(New$review_count)
+
+group1 <- c("Veteran","Intermediate","New")
+value_Users <- c(total_users_veteran,total_users_intermediate, total_users_new)
+value_Stars <- c(avg_stars_veteran, avg_stars_intermediate, avg_stars_new)
+value_Reviews <- c(avg_reviews_veteran, avg_reviews_intermediate, avg_reviews_new)
+
+table1 <- data.frame(value_Users, value_Stars, value_Reviews, row.names = group1)
+table1
+kable(table1, caption = "The summary of users' reviews", digits = 2, col.names = c("The Numbers of Users", "Average Review Stars", "Average Number of Reviews")) %>%
+  kable_styling(bootstrap_options = c("bordered"), position = "center")
+
+```
+
+
+# Visualise the Average Review Stars by User Age Group.
+# You are required to make sure you handle the NA value in your analysis. Explain your findings.
+```{r}
+# assuming the question is mentioning about the group of users by join date (year) 
+
+# using bar chart 
+ggplot(data = table1, mapping = aes(x = group1, y = value_Stars, fill = group1)) + geom_bar(stat = "identity", width = 0.6) + labs(title = "The Average Review Stars by User Age Group", x = "Age Group", y = "Average Review Stars", fill = "Age Group")
+
+
+```
+
+
+# Question 2: 
+# Write the code to analyse the average reviews star by State. 
+# Calculate the average review star, the number of reviews and the number of unique users. 
+```{r}
+#using the dataset review to solve this problem 
+# Question: chẳng phải nếu hỏi 3 câu này thì trong data users có hết đáp án và chỉ cần call tên column ra là xong? hay nó có nghĩa khác? 
+review %>% 
+  group_by(user_id) %>% 
+  summarise(avg_star <- mean(stars))
+
+# Calculate the number of reviews of unique users
+review %>% 
+  group_by(user_id) %>% 
+
+```
+# Visualise the Unique users by State. You are required to make sure you take care of the NA value in your analysis. 
+```{r}
+# approach: using business_Id as the link to know which users live/visit which State, then check if 1 user live in more than 2 states, then start # visualise
+# visualise by histogram or scatterplot 
+sum(is.na(PGA)) #no NA value
+sum(is.na(PGB)) #no NA value
+
+review_number <- str_remove(review$review_id, "r_")
+user_number <- str_remove(review$user_id, "u_")
+business_number <- str_remove(review$business_id, "b_")
+
+sum(duplicated(user_number)) # there are no duplicated id
+review$review_id <- review_number
+review$user_id <- user_number
+review$business_id <- business_number
+
+
+
+
+
+
+
+
+
+
+review_number
+
+# You are required to carry out a seperate analysis for both datasets (BusinessPGA and BusinessPGB). Elaborate on the finding. 
+# Is there any difference between the 2 datasets?
+
+```{r}
+
+```
+
+# Question 3: 
+# Write the code to analyse the top users and their behaviours. 
+# First, identify the top 10 users by the review count. For those top 10 users, calculate their average review stars. Tabulate the summary of the data (kable/kableextra). You are required to make sure you handle the NA value in your analysis.
+# The summary of the data in Question 3, what are the data that you are looking for? 
+# is it summary of data such as mean, median of each columns or it is simply whatever given from the dataframe of the top 10?
+```{r}
+# soft the order of users by the review count
+softed_users <- users %>% 
+  arrange(desc(users$review_count)) 
+
+# take the top 10 users 
+top_10_users <- data.frame(head(softed_users, n = 10))
+top_10_users
+
+# calculate average review stars of the top 10 
+avg_star_top_10 <- mean(top_10_users$average_stars)
+
+# Tabulate the summary of the data
+kable(top_10_users)
+
+kable(summary(top_10_users))
+```
+
+#Version 2 of Q3 part 1
+```{r}
+
+
+numberOfReviewbyUser <- review %>% 
+  group_by(user_id) %>% 
+  count(user_id) %>%
+  rename('Review Count' = n) 
+numberOfReviewbyUser
+
+# Use this one
+user_summary <- review %>%
+  group_by(user_id) %>%
+  summarise(
+    review_count = n(),
+    avg_rating = mean(stars, na.rm = TRUE)
+  )
+user_summary
+
+softed_data <- user_summary %>% arrange(desc(user_summary$review_count)) 
+softed_data
+
+top_10_users2 <- softed_data[2:11,] #này để cắt cái thằng 'blank string' value 
+top_10_users2
+
+kable(top_10_users2)
+```
+
+# Visualise their rating distrubtion using ggplot2 - boxplot. Discuss your findings
+```{r}
+# Version 2
+ggplot(user_summary, mapping = aes(y = avg_rating)) + geom_boxplot() + coord_flip()
+summary(user_summary)
+```
+
+
+# Question 4:
+# Write the code to analyse if there is a major difference between the review behavior of users who joined before and after 2020. 
+# For these 2 groups of users, compare their star rating behaviour and the length of the reviews (number of charaters in the review text). You are required to make sure you handle the NA value in your analysis. # Visualise the average review length by the two groups.
+```{r}
+# using relational data to joint 2 datasets
+# reuse dataframe 'user_summary' for this activity
+
+user_summary <- review %>%
+  group_by(user_id) %>%
+  summarise(
+    review_count = n(),
+    avg_rating = mean(stars, na.rm = TRUE),
+    avg_review_length = round(mean(nchar(text)),2))
+user_summary
+
+joint_data <- users %>% 
+  full_join(user_summary, by = "user_id") %>% 
+  filter(!is.na(member_since))
+joint_data
+
+sum(is.na(joint_data$member_since))
+
+joint_data <- joint_data %>% mutate(Before_or_After_2020 = if_else(member_since < as.Date("2020-01-01"),0,1)) 
+
+joint_data
+
+data_for_compare <- joint_data %>% group_by(as.factor(Before_or_After_2020)) %>% summarise(review_length = mean(avg_review_length, na.rm = TRUE))
+data_for_compare
+
+
+
+
+Before_2020 <- joint_data %>% filter(member_since < as.Date('2020-01-01'))
+After_2020 <- joint_data %>% filter(member_since >= as.Date('2020-01-01'))
+
+# comparing the star rating behaviour and the lenght of the reviews 
+## First, cut the unuse columns 
+``` 
+
+# Visualise the average review length by the two groups.
+```{r}
+ggplot(Before_2020)
+
+```
+
+
+# Discuss your findings.
+
